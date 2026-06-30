@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # UserManagement — Accounts DB based architecture
 
 This generated project follows the uploaded `admin_api_collection.json` URL and variable style and now maps the backend entities to the uploaded `accounts_db.txt` PostgreSQL schema.
@@ -142,3 +143,6 @@ App pass:      Admin@12345
 - `public.role` stores local role metadata and the Keycloak realm role id in `keycloak_role_id`.
 - `public.user_role` maps `user_ref` to `role`.
 - `public.menu_role` maps menu access to roles.
+=======
+# UserManagementWithAPISix
+>>>>>>> d98b2b30ae2f0d051c4f17a46bc10a06a9960082
