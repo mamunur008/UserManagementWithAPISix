@@ -1,0 +1,2 @@
+import { http, unwrap, idempotencyHeaders } from './httpClient.js';
+export const menuItemApi = { list:()=>http.get('/menu-items').then(unwrap), create:(p)=>http.post('/menu-items',p,{headers:idempotencyHeaders()}).then(unwrap), update:(id,p)=>http.put(`/menu-items/${id}`,p,{headers:idempotencyHeaders()}).then(unwrap), remove:(id)=>http.delete(`/menu-items/${id}`,{headers:idempotencyHeaders()}).then(unwrap), setRoles:(id,roleIds)=>http.put(`/menu-items/${id}/roles`,{roleIds}).then(unwrap) };

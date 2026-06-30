@@ -1,0 +1,2 @@
+import { CrudPage } from "../../components/ui/CrudPage.jsx";import { useApiList } from "../../hooks/useApiList.js";import { roleApi } from "../../services/roleApi.js";
+export function RolePermissionsPage(){const {rows,loading,error}=useApiList(roleApi.list);return <CrudPage title="Role Permissions" eyebrow="MAPPING" description="Select a role to manage permissions in role." rows={rows} loading={loading} error={error} columns={[{key:"nameCache",label:"Role",render:r=>r.nameCache||r.name||"-"},{key:"description",label:"Description"},{key:"id",label:"Role ID"}]} />}

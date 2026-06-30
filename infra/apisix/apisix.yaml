@@ -1,0 +1,61 @@
+routes:
+  - id: accounts-api-options
+    uri: /api/admin/*
+    priority: 100
+    methods:
+      - OPTIONS
+    plugins:
+      cors:
+        allow_origins: http://localhost:5173
+        allow_methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+        allow_headers: Authorization,Content-Type,X-Session-Id,Idempotency-Key,X-Permissions
+        expose_headers: X-User-Id,X-Username,X-Roles,X-Permissions,X-Session-Id
+        allow_credential: true
+        max_age: 3600
+      proxy-rewrite:
+        regex_uri:
+          - ^/api/admin/(.*)
+          - /api/$1
+    upstream:
+      type: roundrobin
+      nodes:
+        "usermanagement-api:8080": 1
+
+  - id: accounts-api
+    uri: /api/admin/*
+    priority: 20
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+    plugins:
+      cors:
+        allow_origins: http://localhost:5173
+        allow_methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+        allow_headers: Authorization,Content-Type,X-Session-Id,Idempotency-Key,X-Permissions
+        expose_headers: X-User-Id,X-Username,X-Roles,X-Permissions,X-Session-Id
+        allow_credential: true
+        max_age: 3600
+      proxy-rewrite:
+        regex_uri:
+          - ^/api/admin/(.*)
+          - /api/$1
+      forward-auth:
+        uri: http://auth-service:8080/api/auth/verify
+        request_headers:
+          - Authorization
+          - X-Session-Id
+        upstream_headers:
+          - X-User-Id
+          - X-Username
+          - X-Roles
+          - X-Permissions
+          - X-Session-Id
+    upstream:
+      type: roundrobin
+      nodes:
+        "usermanagement-api:8080": 1
+
+#END

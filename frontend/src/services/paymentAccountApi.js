@@ -1,0 +1,2 @@
+import { http, unwrap, idempotencyHeaders } from './httpClient.js';
+export const paymentAccountApi={ list:()=>http.get('/payment-accounts').then(unwrap), create:(p)=>http.post('/payment-accounts',p,{headers:idempotencyHeaders()}).then(unwrap), setDefault:(id)=>http.post(`/payment-accounts/${id}/set-default`).then(unwrap), getByOrganization:(id)=>http.get(`/organizations/${id}/payment-accounts`).then(unwrap) };

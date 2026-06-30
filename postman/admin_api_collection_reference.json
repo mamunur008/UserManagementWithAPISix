@@ -1,0 +1,996 @@
+{
+  "info": {
+    "_postman_id": "bf534439-eca1-4dd1-bfa8-6f6aef0fed56",
+    "name": "DDD-TS Starter — Accounts (Catena ERP)",
+    "description": "REST collection for the DDD/TypeScript starter.\n\nTopology: Keycloak (IdP) -> APISix (verifies token) -> this app (decode-only).\n\n## Quick start\n1. Select the `ddd-ts-starter` environment.\n2. Run **Keycloak > Get user token (password grant)** — its test script saves `access_token` into the `token` variable automatically.\n3. Run **Accounts > Me > GET /me**.\n\n## Variables\n- `gatewayUrl`  : APISix base, e.g. http://127.0.0.1:9080\n- `apiPrefix`   : the APISix route prefix that REWRITES to /api/v1/accounts (default /api/admin). Your APISix proxy-rewrite must map `^{{apiPrefix}}/(.*)` -> `/api/v1/accounts/$1`.\n- `baseUrl`     : {{gatewayUrl}}{{apiPrefix}} — used by every Accounts request.\n- `directUrl`   : http://127.0.0.1:9044/api/v1/accounts — hit the app directly, bypassing APISix (LOCAL DEV ONLY; in prod the app is network-isolated).\n- `token`       : Bearer access token (auto-filled by the Keycloak requests).\n- `kc*`         : Keycloak host/realm/client settings.\n- `*Id` ids     : fill in as you create resources.\n\nSwap gateway vs. direct by setting Accounts requests' base from `{{baseUrl}}` to `{{directUrl}}` (or just edit `apiPrefix`).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "1144866"
+  },
+  "item": [
+    {
+      "name": "Keycloak",
+      "item": [
+        {
+          "name": "Get user token (password grant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('token', json.access_token);",
+                  "  pm.environment.set(\"token\", json.access_token);",
+                  "  console.log('Saved access_token to {{token}}');",
+                  "}",
+                  "pm.test('got access_token', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{kcLoginClientId}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{kcLoginClientSecret}}",
+                  "description": "only if the login client is confidential",
+                  "disabled": true
+                },
+                {
+                  "key": "username",
+                  "value": "{{kcUsername}}"
+                },
+                {
+                  "key": "password",
+                  "value": "{{kcPassword}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{kcBaseUrl}}/realms/{{kcRealm}}/protocol/openid-connect/token",
+              "host": [
+                "{{kcBaseUrl}}"
+              ],
+              "path": [
+                "realms",
+                "{{kcRealm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "description": "Human user token (carries realm roles, e.g. accounts.superuser). Use the LOGIN client (accounts-web), NOT accounts-admin. The test script saves the token automatically."
+          },
+          "response": []
+        },
+        {
+          "name": "Get service-account token (client_credentials)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{kcAdminClientId}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{kcAdminClientSecret}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{kcBaseUrl}}/realms/{{kcRealm}}/protocol/openid-connect/token",
+              "host": [
+                "{{kcBaseUrl}}"
+              ],
+              "path": [
+                "realms",
+                "{{kcRealm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "description": "The app's OWN token (accounts-admin) for calling the Keycloak Admin API. NOT used to authorize app endpoints. Mostly for debugging."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Me",
+      "item": [
+        {
+          "name": "GET /me",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "Returns { identity, roles (from token), menus }. Works even with no local user_ref row."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "POST /users (create + provision in Keycloak)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "optional; dedupes the write-through saga"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"raju_ahmed\",\n  \"email\": \"raju@gmail.com\",\n  \"firstName\": \"Raju\",\n  \"lastName\": \"Ahmed\",\n  \"organizationId\": \"f2e0c8a0-df48-49c3-a3a2-991aa15dd5bd\",\n  \"bio\": \"\",\n  \"avatarUrl\": \"\",\n  \"phone\": \"01717232670\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /users (in caller's org subtree)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /users/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jdoe@example.com\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"bio\": \"updated bio\",\n  \"avatarUrl\": \"\",\n  \"phone\": \"\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /users/:id/deactivate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "deactivate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /users/:userId/roles/:roleId (assign role)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/roles/{{roleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "roles",
+                "{{roleId}}"
+              ]
+            },
+            "description": "Rules enforced FIRST (403 elevated / 422 org-type mismatch) before any saga starts."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /users/:userId/roles/:roleId (assign role) Copy",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keycloakUserId\": \"4f891b47-068c-4a2a-9817-bc9d560fb0ed\",\n  \"keycloakRoleIds\": [\"99cdd433-5b00-4eab-b1ef-61845e233047\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/assign-roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "assign-roles"
+              ]
+            },
+            "description": "Rules enforced FIRST (403 elevated / 422 org-type mismatch) before any saga starts."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /users/:userId/roles/:roleId (remove role)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/roles/{{roleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "roles",
+                "{{roleId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Roles",
+      "item": [
+        {
+          "name": "POST /roles",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer\",\n  \"description\": \"Customer\",\n  \"isGlobal\": true,\n  \"isElevated\": false,\n  \"assignableOrgTypeIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /roles",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /roles by user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/4f891b47-068c-4a2a-9817-bc9d560fb0ed/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "4f891b47-068c-4a2a-9817-bc9d560fb0ed",
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /roles/:id/org-types",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignableOrgTypeIds\": [\"{{orgTypeId}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/roles/{{roleId}}/org-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleId}}",
+                "org-types"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Organizations",
+      "item": [
+        {
+          "name": "POST /organizations",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Infinity Network Solution\",\n  \"typeId\": \"f29d9b4f-9ad5-4c20-8ea1-477d1448f060\",\n  \"parentId\": \"f2e0c8a0-df48-49c3-a3a2-991aa15dd5bd\",\n  \"commissionRate\": 10,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/organizations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /organizations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/organizations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /organization-types",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/organization-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organization-types"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /organization types",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Vendor\",\n    \"code\": \"VENDOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/organization-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organization-types"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /organizations/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme HQ (renamed)\",\n  \"commissionRate\": 5,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/organizations/{{organizationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "{{organizationId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /organization-types/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Probe Vendor\",\n    \"code\": \"PROBEVENDOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/organization-types/ed34eaa0-520d-4f4a-997a-f71787804b15",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organization-types",
+                "ed34eaa0-520d-4f4a-997a-f71787804b15"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /organization-types/:id Copy",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Probe Vendor\",\n    \"code\": \"PROBEVENDOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/organization-types/ed34eaa0-520d-4f4a-997a-f71787804b15",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organization-types",
+                "ed34eaa0-520d-4f4a-997a-f71787804b15"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /organization-types/:id Copy",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Probe Vendor\",\n    \"code\": \"PROBEVENDOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/organization-types/ed34eaa0-520d-4f4a-997a-f71787804b15",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organization-types",
+                "ed34eaa0-520d-4f4a-997a-f71787804b15"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /organizations/:organizationId/payment-accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/organizations/{{organizationId}}/payment-accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "organizations",
+                "{{organizationId}}",
+                "payment-accounts"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payment Accounts",
+      "item": [
+        {
+          "name": "POST /payment-accounts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationId\": \"{{organizationId}}\",\n  \"type\": \"bank\",\n  \"holder\": \"Acme HQ\",\n  \"details\": { \"accountNumber\": \"000123456\", \"bankName\": \"Demo Bank\" },\n  \"chartOfAccountId\": null,\n  \"isDefault\": true,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payment-accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payment-accounts"
+              ]
+            },
+            "description": "type is one of: bank | mobile | cash."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /payment-accounts/:id/set-default",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payment-accounts/{{paymentAccountId}}/set-default",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payment-accounts",
+                "{{paymentAccountId}}",
+                "set-default"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Menu Items",
+      "item": [
+        {
+          "name": "POST /menu-items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Dashboard\",\n  \"url\": \"/dashboard\",\n  \"icon\": \"layout-dashboard\",\n  \"parentId\": null,\n  \"orderIndex\": 0,\n  \"isPublic\": false,\n  \"active\": true,\n  \"roleIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/menu-items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "menu-items"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /menu-items/:id/roles",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleIds\": [\"{{roleId}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/menu-items/{{menuItemId}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "menu-items",
+                "{{menuItemId}}",
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin (legacy, direct app)",
+      "item": [
+        {
+          "name": "POST /administration/signin",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"admin\",\n  \"password\": \"changeme\"\n}"
+            },
+            "url": {
+              "raw": "{{adminUrl}}/signin",
+              "host": [
+                "{{adminUrl}}"
+              ],
+              "path": [
+                "signin"
+              ]
+            },
+            "description": "Legacy local-DB auth reference module (not Keycloak). Hits the app directly, NOT through APISix."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /administration/userSignup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"newadmin\",\n  \"email\": \"newadmin@example.com\",\n  \"password\": \"changeme\",\n  \"firstName\": \"New\",\n  \"lastName\": \"Admin\"\n}"
+            },
+            "url": {
+              "raw": "{{adminUrl}}/userSignup",
+              "host": [
+                "{{adminUrl}}"
+              ],
+              "path": [
+                "userSignup"
+              ]
+            },
+            "description": "Requires the legacy Auth.authenticate Bearer (from /signin), not the Keycloak gateway token."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "gatewayUrl",
+      "value": "http://127.0.0.1:9080"
+    },
+    {
+      "key": "apiPrefix",
+      "value": "/api/admin"
+    },
+    {
+      "key": "baseUrl",
+      "value": "{{gatewayUrl}}{{apiPrefix}}"
+    },
+    {
+      "key": "directUrl",
+      "value": "http://127.0.0.1:9044/api/v1/accounts"
+    },
+    {
+      "key": "adminUrl",
+      "value": "http://127.0.0.1:9044/api/v1/administration"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "kcBaseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "kcRealm",
+      "value": "myrealm"
+    },
+    {
+      "key": "kcLoginClientId",
+      "value": "accounts-web"
+    },
+    {
+      "key": "kcLoginClientSecret",
+      "value": ""
+    },
+    {
+      "key": "kcUsername",
+      "value": "hct_admin"
+    },
+    {
+      "key": "kcPassword",
+      "value": ""
+    },
+    {
+      "key": "kcAdminClientId",
+      "value": "accounts-admin"
+    },
+    {
+      "key": "kcAdminClientSecret",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "roleId",
+      "value": ""
+    },
+    {
+      "key": "organizationId",
+      "value": ""
+    },
+    {
+      "key": "orgTypeId",
+      "value": ""
+    },
+    {
+      "key": "paymentAccountId",
+      "value": ""
+    },
+    {
+      "key": "menuItemId",
+      "value": ""
+    }
+  ]
+}

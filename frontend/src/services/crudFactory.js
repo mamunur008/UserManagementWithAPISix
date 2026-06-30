@@ -1,0 +1,2 @@
+import { http, unwrap, idempotencyHeaders } from './httpClient.js';
+export function createCrudApi(path){ return { list:()=>http.get(path).then(unwrap), get:(id)=>http.get(`${path}/${id}`).then(unwrap), create:(payload)=>http.post(path,payload,{headers:idempotencyHeaders()}).then(unwrap), update:(id,payload)=>http.put(`${path}/${id}`,payload,{headers:idempotencyHeaders()}).then(unwrap), remove:(id)=>http.delete(`${path}/${id}`,{headers:idempotencyHeaders()}).then(unwrap) }; }

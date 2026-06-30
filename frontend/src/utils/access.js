@@ -1,0 +1,7 @@
+const ADMIN_ROLES = ['admin','system-admin','super-admin','accounts.superuser'];
+export function normalizeArray(value){ return Array.isArray(value) ? value : []; }
+export function getUserRoles(sessionUser, me){ const realm=sessionUser?.realm_access?.roles??[]; const res=Object.values(sessionUser?.resource_access??{}).flatMap(c=>c?.roles??[]); const local=me?.roles??[]; return [...new Set([...realm,...res,...local].filter(Boolean))]; }
+export function getUserPermissions(me){ return [...new Set([...(me?.permissions??[]), ...(me?.permissionKeys??[])].filter(Boolean))]; }
+export function isSystemAdmin(sessionUser, me){ const roles=getUserRoles(sessionUser,me).map(x=>String(x).toLowerCase()); return ADMIN_ROLES.some(r=>roles.includes(r)); }
+export function canAccess(sessionUser, me, requiredPermissions=[], requiredRoles=[]){ if(isSystemAdmin(sessionUser,me)) return true; const roles=getUserRoles(sessionUser,me).map(x=>String(x).toLowerCase()); const perms=getUserPermissions(me).map(x=>String(x).toLowerCase()); const reqPerms=normalizeArray(requiredPermissions).map(x=>String(x).toLowerCase()); const reqRoles=normalizeArray(requiredRoles).map(x=>String(x).toLowerCase()); return (reqPerms.length===0 || reqPerms.some(p=>perms.includes(p))) && (reqRoles.length===0 || reqRoles.some(r=>roles.includes(r))); }
+export function canManage(sessionUser, permission, me){ return canAccess(sessionUser, me, [permission], []); }

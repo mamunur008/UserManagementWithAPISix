@@ -1,0 +1,65 @@
+{
+  "id": "97288598-c78d-403c-bc83-f55e21466a30",
+  "name": "UserManagement Admin API (local)",
+  "values": [
+    {
+      "key": "gatewayUrl",
+      "value": "http://127.0.0.1:9080",
+      "enabled": true
+    },
+    {
+      "key": "apiPrefix",
+      "value": "/api",
+      "enabled": true
+    },
+    {
+      "key": "baseUrl",
+      "value": "{{gatewayUrl}}{{apiPrefix}}",
+      "enabled": true
+    },
+    {
+      "key": "directUrl",
+      "value": "http://127.0.0.1:8081/api",
+      "enabled": true
+    },
+    {
+      "key": "token",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "sessionId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "username",
+      "value": "admin@local.test",
+      "enabled": true
+    },
+    {
+      "key": "password",
+      "value": "Admin@12345",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "roleName",
+      "value": "user-manager",
+      "enabled": true
+    },
+    {
+      "key": "permissionName",
+      "value": "permission:users.read",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-06-16T07:53:37.736302Z",
+  "_postman_exported_using": "ChatGPT"
+}

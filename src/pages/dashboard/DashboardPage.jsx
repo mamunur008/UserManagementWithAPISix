@@ -1,0 +1,5 @@
+import { useSelector } from "react-redux";
+export function DashboardPage() {
+  const { items, source } = useSelector((s) => s.menu);
+  return <section><div className="page-header"><div><p className="eyebrow">OVERVIEW</p><h1 className="page-title">Access control dashboard</h1><p className="page-description">Server-side menu, Keycloak login, APISIX forward-auth and Redis-backed session validation.</p></div></div><div className="dashboard-grid"><div className="metric-card"><p className="metric-label">Menus</p><h2 className="metric-value">{items.length}</h2></div><div className="metric-card"><p className="metric-label">Menu source</p><h2 className="metric-value">{source}</h2></div><div className="metric-card"><p className="metric-label">Gateway prefix</p><h2 className="metric-value small">/api/admin</h2></div></div><div className="card mt"><div className="card-body"><h2 className="card-title">Recommended architecture</h2><p className="page-description">React Client → APISIX → AuthService / Redis → UserManagement API → Keycloak Admin API.</p></div></div></section>;
+}

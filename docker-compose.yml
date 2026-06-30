@@ -1,0 +1,166 @@
+services:
+  app-postgres:
+    image: postgres:17-alpine
+    container_name: um-app-postgres
+    environment:
+      POSTGRES_DB: accounts_db
+      POSTGRES_USER: catena
+      POSTGRES_PASSWORD: catena
+    ports:
+      - "5433:5432"
+    volumes:
+      - app-postgres-data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - um-net
+
+  keycloak-postgres:
+    image: postgres:17-alpine
+    container_name: um-keycloak-postgres
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - keycloak-postgres-data:/var/lib/postgresql/data
+    networks:
+      - um-net
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6.2
+    container_name: um-keycloak
+    command:
+      - start-dev
+      - --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_RELATIVE_PATH: /
+    volumes:
+      - ./infra/keycloak/realm-usermanagement.json:/opt/keycloak/data/import/realm-usermanagement.json:ro
+    depends_on:
+      - keycloak-postgres
+    ports:
+      - "8080:8080"
+    networks:
+      - um-net
+
+  redis:
+    image: redis:8-alpine
+    container_name: um-redis
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - um-net
+
+  usermanagement-api:
+    build:
+      context: .
+      dockerfile: src/UserManagement.Api/Dockerfile
+    container_name: um-api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__UserManagementDb: Host=app-postgres;Port=5432;Database=accounts_db;Username=catena;Password=catena
+      Keycloak__BaseUrl: http://keycloak:8080
+      Keycloak__Realm: usermanagement
+      Keycloak__Issuer: http://localhost:8080/realms/usermanagement
+      Keycloak__ValidIssuers__0: http://localhost:8080/realms/usermanagement
+      Keycloak__ValidIssuers__1: http://127.0.0.1:8080/realms/usermanagement
+      Keycloak__JwksUrl: http://keycloak:8080/realms/usermanagement/protocol/openid-connect/certs
+      Keycloak__PublicClientId: usermanagement-web
+      Keycloak__ClientId: usermanagement-web
+      Keycloak__AdminClientId: usermanagement-api
+      Keycloak__AdminClientSecret: local-dev-secret-change-me
+      Redis__ConnectionString: redis:6379
+      Session__TtlMinutes: 120
+    depends_on:
+      - app-postgres
+      - keycloak
+      - redis
+    ports:
+      - "9044:8080"
+    networks:
+      - um-net
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: src/AuthService.Api/Dockerfile
+    container_name: um-auth-service
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__UserManagementDb: Host=app-postgres;Port=5432;Database=accounts_db;Username=catena;Password=catena
+      Redis__ConnectionString: redis:6379
+      Session__TtlMinutes: 60
+      Keycloak__BaseUrl: http://keycloak:8080
+      Keycloak__Realm: usermanagement
+      Keycloak__Issuer: http://localhost:8080/realms/usermanagement
+      Keycloak__ValidIssuers__0: http://localhost:8080/realms/usermanagement
+      Keycloak__ValidIssuers__1: http://127.0.0.1:8080/realms/usermanagement
+      Keycloak__JwksUrl: http://keycloak:8080/realms/usermanagement/protocol/openid-connect/certs
+      Keycloak__IntrospectionUrl: http://keycloak:8080/realms/usermanagement/protocol/openid-connect/token/introspect
+      Keycloak__PublicClientId: usermanagement-web
+      Keycloak__ClientId: usermanagement-web
+      Keycloak__AdminClientId: usermanagement-api
+      Keycloak__AdminClientSecret: local-dev-secret-change-me
+    depends_on:
+      - keycloak
+      - redis
+    ports:
+      - "8082:8080"
+    networks:
+      - um-net
+
+  apisix:
+    image: apache/apisix:3.10.0-debian
+    container_name: um-apisix
+    volumes:
+      - ./infra/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./infra/apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    depends_on:
+      - usermanagement-api
+      - auth-service
+    ports:
+      - "9080:9080"
+      - "9180:9180"
+    networks:
+      - um-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: um-frontend
+    environment:
+      VITE_API_BASE_URL: http://127.0.0.1:9080/api/admin
+      VITE_KC_BASE_URL: http://localhost:8080
+      VITE_KC_REALM: usermanagement
+      VITE_KC_CLIENT_ID: usermanagement-web
+    ports:
+      - "5173:5173"
+    depends_on:
+      - apisix
+      - keycloak
+    networks:
+      - um-net
+
+networks:
+  um-net:
+    driver: bridge
+
+volumes:
+  app-postgres-data:
+  keycloak-postgres-data:
+  redis-data:

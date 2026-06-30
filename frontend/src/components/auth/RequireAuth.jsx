@@ -1,0 +1,4 @@
+import { Navigate, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+export function RequireAuth({children}){ const {isAuthenticated,loading,bootstrapped}=useSelector(s=>s.session); const loc=useLocation(); if(!bootstrapped||loading) return <main className="loading-page"><div className="loading-card"><div className="brand-mark mx-auto">UM</div><h1>Loading session...</h1><p>Please wait while we check Keycloak login.</p></div></main>; if(!isAuthenticated) return <Navigate to="/login" replace state={{from:loc}}/>; return children; }
+export function PublicOnly({children}){ const {isAuthenticated,loading,bootstrapped}=useSelector(s=>s.session); if(!bootstrapped||loading) return <main className="loading-page"><div className="loading-card">Loading...</div></main>; if(isAuthenticated) return <Navigate to="/" replace/>; return children; }

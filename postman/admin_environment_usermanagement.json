@@ -1,0 +1,26 @@
+{
+  "name": "usermanagement local",
+  "values": [
+    { "key": "gatewayUrl", "value": "http://127.0.0.1:9080", "enabled": true },
+    { "key": "apiPrefix", "value": "/api/admin", "enabled": true },
+    { "key": "baseUrl", "value": "{{gatewayUrl}}{{apiPrefix}}", "enabled": true },
+    { "key": "directUrl", "value": "http://127.0.0.1:9044/api", "enabled": true },
+    { "key": "adminUrl", "value": "http://127.0.0.1:9044/api/v1/administration", "enabled": true },
+    { "key": "token", "value": "", "enabled": true },
+    { "key": "kcBaseUrl", "value": "http://localhost:8080", "enabled": true },
+    { "key": "kcRealm", "value": "usermanagement", "enabled": true },
+    { "key": "kcLoginClientId", "value": "usermanagement-web", "enabled": true },
+    { "key": "kcLoginClientSecret", "value": "", "enabled": true },
+    { "key": "kcUsername", "value": "admin@local.test", "enabled": true },
+    { "key": "kcPassword", "value": "Admin@12345", "enabled": true },
+    { "key": "kcAdminClientId", "value": "usermanagement-api", "enabled": true },
+    { "key": "kcAdminClientSecret", "value": "local-dev-secret-change-me", "enabled": true },
+    { "key": "userId", "value": "", "enabled": true },
+    { "key": "roleId", "value": "", "enabled": true },
+    { "key": "organizationId", "value": "", "enabled": true },
+    { "key": "orgTypeId", "value": "", "enabled": true },
+    { "key": "paymentAccountId", "value": "", "enabled": true },
+    { "key": "menuItemId", "value": "", "enabled": true }
+  ],
+  "_postman_variable_scope": "environment"
+}

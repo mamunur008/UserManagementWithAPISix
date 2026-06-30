@@ -1,0 +1,49 @@
+{
+  "realm": "usermanagement",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": { "realm": [
+    { "name": "admin", "description": "System administrator" },
+    { "name": "user-manager" },
+    { "name": "role-manager" },
+    { "name": "permission:users.read" },
+    { "name": "permission:users.create" },
+    { "name": "permission:users.update" },
+    { "name": "permission:roles.read" },
+    { "name": "permission:roles.assign" }
+  ]},
+  "clients": [
+    {
+      "clientId": "usermanagement-web",
+      "name": "UserManagement React SPA",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    },
+    {
+      "clientId": "usermanagement-api",
+      "name": "UserManagement API service account",
+      "enabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "secret": "local-dev-secret-change-me"
+    }
+  ],
+  "users": [
+    {
+      "username": "admin@local.test",
+      "email": "admin@local.test",
+      "firstName": "System",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Admin@12345", "temporary": false }],
+      "realmRoles": ["admin", "user-manager", "role-manager", "permission:users.read", "permission:users.create", "permission:users.update", "permission:roles.read", "permission:roles.assign"]
+    }
+  ]
+}
